@@ -3,6 +3,8 @@
 
 /dts-v1/;
 
+#include <dt-bindings/clock/qcom,gcc-msm8998.h>
+
 #include "msm8998.dtsi"
 #include "pm8998.dtsi"
 #include "pmi8998.dtsi"
@@ -30,8 +32,8 @@
 		/* For simplefb hack */
 		stdout-path = "display0";
 
-		/* Without "clk_ignore_unused" the kernel panics early */
-		bootargs = "earlycon clk_ignore_unused";
+		/* Without "clk_ignore_unused" in cmdline the kernel panics early */
+		bootargs = "earlycon clk_ignore_unused dyndbg=\"file drivers/usb/dwc3/* +p\"";
 
 		/*
 		 * hack: Use framebuffer setup by the bootloader.
@@ -394,18 +396,34 @@
 
 &usb3 {
 	status = "okay";
+
+	// For "GCC_USB30_MASTER_CLK" in HS mode (>=60 MHz)
+	assigned-clock-rates = <19200000>, <60000000>;
+
+	// Disable USB3 pipe_clk requirement
+	qcom,select-utmi-as-pipe-clk = <1>;
 };
 
 &usb3_dwc3 {
-	dr_mode = "host"; /* Force to host until we have Type-C hooked up */
+	// Drop "usb1_ssphy" / "usb3-phy" PHY -> we now get a "usb0" interface
+	phys = <&qusb2phy>;
+	phy-names = "usb2-phy";
+
+	maximum-speed = "high-speed"; // We should only operate at USB 2.0 speeds
+
+	dr_mode = "peripheral"; // Force to peripheral until we have Type-C hooked up
+
+	// Add missing "ref", "bus_early" & "suspend" clocks mentioned in dmesg before
+	clocks = <&gcc GCC_USB3_CLKREF_CLK>, <&gcc GCC_USB30_MASTER_CLK>, <&gcc GCC_USB30_SLEEP_CLK>;
+	clock-names = "ref", "bus_early", "suspend";
 };
 
-&usb3phy {
+/*&usb3phy {
 	status = "okay";
 
 	vdda-phy-supply = <&vreg_l1a_0p875>;
 	vdda-pll-supply = <&vreg_l2a_1p2>;
-};
+};*/
 
 &pcie0 {
 	status = "disabled";
